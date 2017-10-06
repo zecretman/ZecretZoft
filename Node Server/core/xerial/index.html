@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta http-equiv="Content-Type" content="text/html;charset=utf-8" />
+		<title>Xerial.NW</title>
+		
+		<script src="core/Session.js" ></script>
+		<script src="core/Record.js" ></script>
+		<script src="core/RecordMapper.js" ></script>
+		<script src="core/SQLiteConnector.js" ></script>
+		<script src="core/SQLiteGenerator.js" ></script>
+		<script src="core/TableMetaData.js" ></script>
+		
+		<script src="core/column/DateColumn.js" ></script>
+		<script src="core/column/DateTimeColumn.js" ></script>
+		<script src="core/column/IntegerColumn.js" ></script>
+		<script src="core/column/FloatColumn.js" ></script>
+		<script src="core/column/StringColumn.js" ></script>
+		<script src="core/column/TextColumn.js" ></script>
+		<script src="core/column/ColumnMetaData.js" ></script>
+		
+		<script src="lib/jquery.js" ></script>
+		
+		<style>
+			h1{
+				color:#444;
+			}
+			
+			.button{
+				background:#06F;
+				color:white;
+				padding:5px 16px;
+				font-size:14px;
+				border-radius:3px;
+				margin-right:20px;
+				text-decoration:none;
+			}
+		</style>
+	</head>
+	<body>
+		<h1>Xerial.NW</h1>
+		<p>
+			<a id="startCategoryButton" href="#" class="button">Start Category Processing</a>
+			<a id="startProductButton" href="#" class="button">Start Product Processing</a>
+		</p>
+		<script>
+		
+			/// ************** Important ****************
+			/// Methods called by async libraries must use variable 'object' instead of keyword 'this'.
+			/// In async functions, keyword 'this' means function itself.
+			/// More for async usage : https://caolan.github.io/async/docs.html
+			
+			var async = require('async')
+			var POSProduct = function(){
+				Record.call(this);
+				
+				this.getLabel = function(){
+					return this.name+' '+this.referenceCode;
+				}
+			}
+			
+			var POSProductCategory = function(){
+				Record.call(this);
+				
+				this.getLabel = function(){
+					return this.name+' '+this.referenceCode;
+				}
+			}
+			
+			var POSProductMark = function(){
+				Record.call(this);
+			}
+			
+			var POSProductFile = function(){
+				Record.call(this);
+			}
+			
+			var POSProductUnit = function(){
+				Record.call(this);
+			}
+			
+			var POSUnit = function(){
+				Record.call(this);
+			}
+			
+			var POSModelClass = {
+				'POSProduct' : POSProduct,
+				'POSProductCategory' : POSProductCategory,
+				'POSProductMark' : POSProductMark,
+				'POSProductFile' : POSProductFile,
+				'POSProductUnit' : POSProductUnit,
+				'POSUnit' : POSUnit,
+			};
+			
+			var POSProductController = function(main){
+				var object = this;
+				
+				this.main = main;
+				
+				this.process = function(){
+					async.waterfall([
+						object.insert,
+						object.select,
+					], function(error, result){
+						console.log('Final call POSProductController.process', result);
+						if(callback != undefined) callback(results);
+					});
+				}
+				
+				this.insert = function(callback){
+					var session = object.main.session;
+					var product = session.create(POSProduct);
+					product.name = 'Lipstick';
+					product.cid = 1;
+					console.log(product.lastUpdate, typeof product.lastUpdate);
+					for(var i=0;i<5;i++){
+						var file = session.create(POSProductFile);
+						file.path = '/tmp/file/path';
+						product.productFile.push(file);
+					}
+					session.insert(product, function(record){
+						session.commit(callback);
+					});
+				}
+				
+				this.select = function(callback){
+					var session = object.main.session;
+					session.select(POSProduct, 'ORDER BY id DESC LIMIT 5', function(recordList){
+						callback(null, recordList);
+					});
+				}
+			}
+			
+			var POSCategoryController = function(main){
+				var object = this;
+				
+				this.main = main;
+				
+				this.process = function(callback){
+					async.waterfall([
+						object.insert,
+						object.insertMultiple,
+						object.select,
+						object.update,
+						object.drop,
+					], function(error, result){
+						console.log('Final call POSCategoryController.process', result);
+						if(callback != undefined) callback(results);
+					});
+				}
+				
+				this.insert = function(callback){
+					var session = object.main.session;
+					var category = object.create();
+					session.insert(category, function(){
+						session.commit(callback);
+					}, false);
+				}
+				
+				this.insertMultiple = function(callback){
+					var session = object.main.session;
+					var categoryList = [];
+					for(var i=0; i<5;i++){
+						categoryList.push(object.create());
+					}
+					session.insertMultiple(categoryList, function(){
+						session.commit(callback);
+					}, false);
+				}
+				
+				this.select = function(callback){
+					var session = object.main.session;
+					session.select(POSProductCategory, 'ORDER BY id DESC LIMIT 3', function(recordList){
+						console.log(recordList);
+						callback(null, recordList);
+					});
+				}
+				
+				this.update = function(recordList, callback){
+					var session = object.main.session;
+					var update = [];
+					for(var i=0; i<recordList.list.length;i++){
+						var record = recordList[i];
+						record.referenceCode = 'AABBCCDD';
+						update.push(record);
+					}
+					session.updateMultiple(update, function(){
+						session.commit(function(){
+							callback(null, recordList);
+						});
+					});
+				}
+				
+				this.drop = function(recordList, callback){
+					if(recordList.length){
+						var session = object.main.session;
+						var drop = [recordList[2], recordList[1]];
+						session.dropMultiple(drop, function(){
+							session.commit(callback)
+						}, false);
+					}else{
+						callback(null, recordList);
+					}
+				}
+				
+				this.create = function(){
+					var session = object.main.session;
+					var category = session.create(POSProductCategory);
+					category.name = 'Cosmetic';
+					category.parentCategory = 1;
+					category.description = 'Cosmetic products';
+					category.level = 0;
+					category.referenceCode = '11223344';
+					return category;
+				}
+			}
+			
+			var POSMainController = function(){
+				var object = this;
+				
+				this.categoryController = new POSCategoryController(this);
+				this.productController = new POSProductController(this);
+				
+				this.createSession =  function(modelMetaData){
+					this.modelMetaData = modelMetaData;
+					this.session = new Session(new SQLiteConnector('local.db'));
+					this.session.connect();
+					for(var i in POSModelClass){
+						this.session.appendModel(POSModelClass[i], modelMetaData.model[i]);
+					}
+					return this.session;
+				}
+				
+				this.createTable = function(callback){
+					object.session.checkTable(function(){
+						console.log("Table checked.");
+						callback(null);
+					});
+				}
+				
+				this.initEvent = function(callback){
+					$("#startCategoryButton").click(function(){
+						object.categoryController.process();
+					});
+					
+					$("#startProductButton").click(function(){
+						object.productController.process();
+					});
+					callback(null);
+				}
+			}
+			
+			/// The God Object.
+			var main = new POSMainController();
+			
+			function processData(modelMetaData){
+				console.log(JSON.parse(modelMetaData));
+				main.createSession(JSON.parse(modelMetaData));
+				async.series([
+					main.createTable,
+					main.initEvent,
+				], function(error, results){
+					console.log("Finall call process data.", error, results);
+				});
+			}
+			
+			var url = 'http://localhost:8080/pos/meta/model';
+			$.ajax({
+				'type' : 'GET',
+				'crossDomain' : true,
+	            'contentType' : "application/json; charset=utf-8",
+				'url' : url,
+				'success' : processData,
+				'error' : function(){
+					console.log('Error by loading : '+url);
+				}
+			});
+			
+		</script>
+	</body>
+</html>

@@ -1,0 +1,14 @@
+{
+	"name": "TiamatDesktop",
+	"version": "0.1",
+	"main": "index.html",
+	"window" : {
+		"title": "node-webkit demo",
+		"icon": "layout/icon/Logo.png",
+		"toolbar": true,
+		"frame": true,
+		"position": "center",
+		"min_width": 680,
+		"min_height": 420
+	}
+}
